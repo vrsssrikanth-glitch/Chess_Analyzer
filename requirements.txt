@@ -1,4 +1,6 @@
 streamlit
 matplotlib
-python-chess
-pip install cairosvg
+chess
+chess.svg
+chess.engine
+cairosvg
