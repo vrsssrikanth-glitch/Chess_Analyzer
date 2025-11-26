@@ -2,5 +2,3 @@ streamlit
 matplotlib
 numpy
 chess
-cairosvg
-.
