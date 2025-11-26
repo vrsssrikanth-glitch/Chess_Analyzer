@@ -1,6 +1,15 @@
 streamlit
 matplotlib
+numpy
 chess
 chess.svg
 chess.engine
 cairosvg
+re
+time
+base64
+list
+Tuple
+Dict 
+Any
+BytesIO
