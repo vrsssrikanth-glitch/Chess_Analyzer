@@ -239,27 +239,6 @@ def classify_and_reason(analysis: List[Dict[str,Any]]) -> List[Dict[str,Any]]:
         prev_eval = cur_eval
     return out
 
-# ---- New function for stepwise analysis ----
-def stepwise_analysis_summaries(analysis: List[Dict[str,Any]]) -> List[str]:
-    texts = []
-    prev_eval = 0
-    for entry in analysis:
-        ply = entry["ply"]
-        san = entry["san"]
-        mover = "White" if (ply % 2 == 1) else "Black"
-        cur_eval = entry["eval"]
-        delta = cur_eval - prev_eval
-        mover_delta = delta if mover == "White" else -delta
-        s = f"Move {ply}: {mover} played `{san}`. "
-        if entry.get("label"):
-            s += f"**{entry['label']}** move. "
-        s += f"Eval after move: {cur_eval} cp (White POV). "
-        if entry.get("reason"):
-            s += f"Reason: {entry['reason']} "
-        texts.append(s.strip())
-        prev_eval = cur_eval
-    return texts
-
 def suggest_best_move(analysis: List[Dict[str,Any]]) -> Tuple[int, str, str, int]:
     """
     Suggests the move that gave the largest improvement in evaluation for the mover (excluding blunders/mistakes)
@@ -312,7 +291,7 @@ if not CHESS_AVAILABLE:
     st.error("python-chess not found. Install with `pip install python-chess` and rerun.")
     st.stop()
 if not CAIROSVG_AVAILABLE:
-    st.warning("cairosvg not found — PNG conversion is disabled. Install with `pip install cairosvg` for best visuals.")
+    st.info("`cairosvg` not found — PNG board rendering not available, falling back to SVG rendering. Install with `pip install cairosvg` for image-rendered chessboards.")
 
 # Sidebar
 with st.sidebar:
@@ -384,12 +363,6 @@ for entry in analysis:
         if mover_delta >= 30:
             entry["label"] = "Good"
     prev_eval = cur_eval
-
-# -------- New Step-wise Analysis Section --------
-st.subheader("Stepwise Analysis")
-stepwise_texts = stepwise_analysis_summaries(analysis)
-for s in stepwise_texts:
-    st.markdown(s)
 
 # -------- Suggest Best Step Section --------
 best_ply, best_mover, best_move, best_improve = suggest_best_move(analysis)
