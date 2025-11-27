@@ -239,6 +239,52 @@ def classify_and_reason(analysis: List[Dict[str,Any]]) -> List[Dict[str,Any]]:
         prev_eval = cur_eval
     return out
 
+# ---- New function for stepwise analysis ----
+def stepwise_analysis_summaries(analysis: List[Dict[str,Any]]) -> List[str]:
+    texts = []
+    prev_eval = 0
+    for entry in analysis:
+        ply = entry["ply"]
+        san = entry["san"]
+        mover = "White" if (ply % 2 == 1) else "Black"
+        cur_eval = entry["eval"]
+        delta = cur_eval - prev_eval
+        mover_delta = delta if mover == "White" else -delta
+        s = f"Move {ply}: {mover} played `{san}`. "
+        if entry.get("label"):
+            s += f"**{entry['label']}** move. "
+        s += f"Eval after move: {cur_eval} cp (White POV). "
+        if entry.get("reason"):
+            s += f"Reason: {entry['reason']} "
+        texts.append(s.strip())
+        prev_eval = cur_eval
+    return texts
+
+def suggest_best_move(analysis: List[Dict[str,Any]]) -> Tuple[int, str, str, int]:
+    """
+    Suggests the move that gave the largest improvement in evaluation for the mover (excluding blunders/mistakes)
+    Returns: ply, mover, san, mover_delta
+    """
+    best_ply = None
+    best_improve = -1e9
+    best_move = ""
+    best_mover = ""
+    prev_eval = 0
+    for entry in analysis:
+        ply = entry["ply"]
+        mover = "White" if (ply % 2 == 1) else "Black"
+        cur_eval = entry["eval"]
+        delta = cur_eval - prev_eval
+        mover_delta = delta if mover == "White" else -delta
+        if entry.get("label") is None and mover_delta >= 30:
+            if mover_delta > best_improve:
+                best_improve = mover_delta
+                best_ply = ply
+                best_move = entry["san"]
+                best_mover = mover
+        prev_eval = cur_eval
+    return best_ply, best_mover, best_move, int(best_improve) if best_ply else (None, None, None, 0)
+
 # -------------------------
 # Color map for arrows and markers
 # -------------------------
@@ -339,6 +385,22 @@ for entry in analysis:
             entry["label"] = "Good"
     prev_eval = cur_eval
 
+# -------- New Step-wise Analysis Section --------
+st.subheader("Stepwise Analysis")
+stepwise_texts = stepwise_analysis_summaries(analysis)
+for s in stepwise_texts:
+    st.markdown(s)
+
+# -------- Suggest Best Step Section --------
+best_ply, best_mover, best_move, best_improve = suggest_best_move(analysis)
+st.subheader("Suggested Best Step")
+if best_ply:
+    st.success(
+        f"**Best move found:** Move {best_ply}, {best_mover} played `{best_move}` — improved evaluation by {best_improve} cp!"
+    )
+else:
+    st.info("No outstandingly positive move found by heuristic.")
+
 # Summary
 st.subheader("Summary")
 st.write(f"Plies analyzed: {len(analysis)} — Illegal moves: {len(illegal_moves)}")
@@ -400,30 +462,21 @@ if show_heatmap:
 # -------------------------
 # Replay controls (session-state stable)
 # -------------------------
-st.subheader("Replay Controls (Play / Pause / Prev / Next / Reset)")
+st.subheader("Replay Controls (Prev / Next / Reset)")
 if "frame_index" not in st.session_state:
     st.session_state.frame_index = 0
-if "playing" not in st.session_state:
+if "playing" not in st.session_state:  # Remove 'playing' logic entirely
     st.session_state.playing = False
 
-c1, c2, c3, c4, c5 = st.columns([1,1,1,1,2])
+c1, c2, c3 = st.columns([1,1,2])
 with c1:
     if st.button("⏮ Prev"):
-        st.session_state.playing = False
         st.session_state.frame_index = max(0, st.session_state.frame_index - 1)
 with c2:
-    if st.button("▶ Play"):
-        st.session_state.playing = True
-with c3:
-    if st.button("⏸ Pause"):
-        st.session_state.playing = False
-with c4:
     if st.button("⏭ Next"):
-        st.session_state.playing = False
         st.session_state.frame_index = min(len(analysis), st.session_state.frame_index + 1)
-with c5:
+with c3:
     if st.button("⟲ Reset"):
-        st.session_state.playing = False
         st.session_state.frame_index = 0
 
 # Slider scrubber
@@ -431,7 +484,6 @@ max_index = len(analysis)
 new_index = st.slider("Scrub to ply (0 = start)", 0, max_index, st.session_state.frame_index)
 if new_index != st.session_state.frame_index:
     st.session_state.frame_index = new_index
-    st.session_state.playing = False
 
 # Build board to current frame
 board = chess.Board()
@@ -449,7 +501,6 @@ if st.session_state.frame_index > 0:
     try:
         from_sq = last_move.from_square
         to_sq = last_move.to_square
-        # chess.svg.Arrow takes squares (0..63) and optional color
         arrows = [chess.svg.Arrow(from_sq, to_sq, color=arrow_color)]
     except Exception:
         arrows = None
@@ -467,7 +518,6 @@ png = svg_to_png_bytes(svg)
 if png:
     st.image(png)
 else:
-    # raw svg fallback
     st.components.v1.html(svg, height=680)
 
 # Per-move evaluation text / reason
@@ -482,16 +532,6 @@ else:
     label = le.get("label", None)
     if label:
         st.markdown(f"**{label}** for **{mover}** — {reason}")
-
-# Auto-advance when playing
-if st.session_state.playing:
-    if st.session_state.frame_index < max_index:
-        st.session_state.frame_index += 1
-        time.sleep(anim_delay)
-        st.experimental_rerun()
-    else:
-        st.session_state.playing = False
-        st.session_state.frame_index = max_index
 
 # Final position display
 st.subheader("Final Position")
