@@ -1,5 +1,5 @@
 Streamlit Chess Analyzer — Full Features
-- Full controls (Play / Pause / Next / Prev / Reset)
+- Full controls (Next / Prev / Reset)
 - Color-coded arrows (blunder/mistake/inaccuracy/good)
 - Per-move evaluation text
 - Engine score graph (matplotlib)
